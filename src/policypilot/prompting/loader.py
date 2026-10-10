@@ -56,7 +56,11 @@ def load_prompt(prompt_id: str) -> Prompt:
     )
 
 def list_prompt_ids() -> list[str]:
-    return [p.stem for p in Path("prompts").glob("*.yaml")]
+    valid_prompts = []
+    for p in Path("prompts").glob("*.yaml"):
+        if p.stat().st_size > 10:  # Must have at least some content
+            valid_prompts.append(p.stem)
+    return valid_prompts
 
 def render_user_message(template: str, **kwargs: str) -> str:
     try:
