@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PolicyPilot - Secure Citizen AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <style>
+        :root {
+            --bg: #212121;
+            --sidebar: #171717;
+            --surface: #2f2f2f;
+            --border: #383838;
+            --primary: #ffffff;
+            --text-main: #ececec;
+            --text-muted: #b4b4b4;
+            --error: #ef4444;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Login Screen */
+        #login-view {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: opacity 0.5s ease;
+            position: absolute;
+            z-index: 10;
+            background: var(--bg);
+        }
+
+        .glass-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            width: 320px;
+        }
+
+        h1.brand {
+            font-size: 28px;
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            color: var(--text-main);
+            text-align: center;
+        }
+
+        p.subtitle {
+            text-align: center;
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: none;
+        }
+
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 14px 16px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        input:focus {
+            border-color: #555;
+        }
+
+        button.btn-primary {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary);
+            color: black;
+            font-weight: 500;
+            font-size: 15px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button.btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        /* App View */
+        #app-view {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            position: absolute;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: var(--sidebar);
+            border-right: none;
+            padding: 20px 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-item {
+            margin-bottom: 24px;
+        }
+
+        select {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: inherit;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            align-items: center;
+        }
+
+        .chat-header {
+            width: 100%;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            position: absolute;
+            top: 0;
+            z-index: 5;
+        }
+        
+        .chat-header h2 {
+            margin: 0;
+            font-weight: 500;
+            font-size: 16px;
+            color: var(--text-muted);
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .logout-btn:hover {
+            color: white;
+            background: var(--surface);
+        }
+
+        .chat-history {
+            width: 100%;
+            max-width: 768px;
+            flex: 1;
+            padding: 60px 20px 20px 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .msg-user {
+            align-self: flex-end;
+            background: var(--surface);
+            padding: 12px 18px;
+            border-radius: 18px;
+            color: var(--text-main);
+            font-size: 15px;
+            line-height: 1.5;
+            max-width: 70%;
+        }
+
+        .msg-ai {
+            align-self: flex-start;
+            background: transparent;
+            padding: 12px 0;
+            border-radius: 0;
+            line-height: 1.6;
+            font-size: 15px;
+            width: 100%;
+        }
+
+        .msg-ai .metrics {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        /* Markdown Styling */
+        .content p { margin: 0 0 10px 0; }
+        .content p:last-child { margin-bottom: 0; }
+        .content pre { background: #1e1e1e; padding: 12px; border-radius: 8px; overflow-x: auto; font-family: monospace; font-size: 13px; border: 1px solid var(--border); }
+        .content code { background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 4px; font-family: monospace; font-size: 13px; color: #a5b4fc; }
+        .content pre code { background: transparent; padding: 0; color: inherit; }
+        .content ul, .content ol { margin: 10px 0; padding-left: 20px; }
+        .content li { margin-bottom: 5px; }
+        .content strong { color: #fff; }
+
+        .input-area {
+            width: 100%;
+            max-width: 768px;
+            padding: 20px;
+            background: var(--bg);
+            box-sizing: border-box;
+        }
+
+        .input-box {
+            display: flex;
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 10px 14px;
+            align-items: flex-end;
+        }
+
+        .input-box:focus-within {
+            background: #333;
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            padding: 6px 12px;
+            color: white;
+            font-family: inherit;
+            font-size: 15px;
+            outline: none;
+            resize: none;
+            min-height: 24px;
+            max-height: 150px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+
+        .send-btn {
+            background: var(--primary);
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            margin-bottom: 2px;
+            padding: 0;
+        }
+        
+        .send-btn:hover {
+            opacity: 0.9;
+        }
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .send-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: black;
+        }
+
+        .typing {
+            display: flex;
+            gap: 4px;
+            padding: 16px 20px;
+            align-self: flex-start;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-muted);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Toast Notifications */
+        #toast-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            background: var(--surface);
+            border-left: 4px solid var(--primary);
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            color: white;
+            font-size: 14px;
+            animation: slideIn 0.3s forwards;
+            backdrop-filter: blur(10px);
+        }
+        .toast.error {
+            border-left-color: var(--error);
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container"></div>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-view">
+        <div class="glass-card">
+            <h1 class="brand">PolicyPilot</h1>
+            <p class="subtitle">Secure Citizen Services Agent</p>
+            
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" id="username" placeholder="admin" value="admin">
+            </div>
+            
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="password" placeholder="••••••••" value="password">
+            </div>
+            
+            <button class="btn-primary" onclick="login()">Access System</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP SCREEN -->
+    <div id="app-view">
+        <div class="sidebar">
+            <h1 class="brand" style="font-size: 24px; text-align: left; margin-bottom: 40px;">PolicyPilot</h1>
+            
+            <div class="sidebar-item">
+                <div class="input-group">
+                    <label>Agent Configuration</label>
+                    <select id="promptSelect"></select>
+                </div>
+            </div>
+
+            <div class="sidebar-item">
+                <div class="input-group">
+                    <label>Network Mode</label>
+                    <select>
+                        <option>OpenRouter Fallback</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="margin-top: auto; color: var(--text-muted); font-size: 12px; text-align: center;">
+                v2.0.0 (10/10 Build)
+            </div>
+        </div>
+
+        <div class="main-chat">
+            <div class="chat-header">
+                <h2>PolicyPilot Terminal</h2>
+                <button class="logout-btn" onclick="logout()">Disconnect</button>
+            </div>
+            
+            <div class="chat-history" id="chat-history">
+                <!-- Welcome Message -->
+                <div class="message msg-ai">
+                    <div class="metrics">SYSTEM INITIALIZED</div>
+                    <div class="content">Welcome to PolicyPilot. I am a specialized AI agent designed to answer questions about civic policies, grading, attendance, and administrative rules. How can I help you today?</div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-box">
+                    <textarea id="question" placeholder="Ask about minimum age limits, eligibility, or policies... (Shift+Enter for new line)" oninput="autoResize(this)" onkeydown="handleEnter(event)"></textarea>
+                    <button class="send-btn" id="sendBtn" onclick="askQuestion()">
+                        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Init Marked JS with Highlight JS
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                }
+                return hljs.highlightAuto(code).value;
+            }
+        });
+
+        // Load prompts for sidebar
+        fetch('/api/prompts').then(r => r.json()).then(prompts => {
+            const select = document.getElementById('promptSelect');
+            prompts.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p; opt.innerHTML = p; select.appendChild(opt);
+            });
+        }).catch(e => console.log('Failed to load prompts', e));
+
+        function login() {
+            const btn = document.querySelector('#login-view button');
+            btn.innerHTML = 'Authenticating...';
+            btn.style.opacity = '0.7';
+            
+            setTimeout(() => {
+                document.getElementById('login-view').style.transform = 'scale(1.1)';
+                document.getElementById('login-view').style.opacity = '0';
+                
+                setTimeout(() => {
+                    document.getElementById('login-view').style.display = 'none';
+                    document.getElementById('app-view').style.pointerEvents = 'all';
+                    document.getElementById('app-view').style.opacity = '1';
+                    showToast('Authentication Successful. Connected to OpenRouter.');
+                }, 500);
+            }, 800);
+        }
+
+        function logout() {
+            document.getElementById('app-view').style.opacity = '0';
+            document.getElementById('app-view').style.pointerEvents = 'none';
+            setTimeout(() => {
+                const btn = document.querySelector('#login-view button');
+                btn.innerHTML = 'Access System';
+                btn.style.opacity = '1';
+                document.getElementById('login-view').style.display = 'flex';
+                setTimeout(() => {
+                    document.getElementById('login-view').style.transform = 'scale(1)';
+                    document.getElementById('login-view').style.opacity = '1';
+                    // Reset chat
+                    conversationHistory = [];
+                    const h = document.getElementById('chat-history');
+                    h.innerHTML = `<div class="message msg-ai"><div class="metrics">SYSTEM INITIALIZED</div><div class="content">Welcome to PolicyPilot. I am a specialized AI agent designed to answer questions about civic policies, grading, attendance, and administrative rules. How can I help you today?</div></div>`;
+                }, 50);
+            }, 500);
+        }
+
+        function showToast(message, isError = false) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${isError ? 'error' : ''}`;
+            toast.innerText = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = (el.scrollHeight) + 'px';
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                askQuestion();
+            }
+        }
+
+        function appendMessage(text, isUser = false, metrics = null) {
+            const history = document.getElementById('chat-history');
+            const div = document.createElement('div');
+            div.className = `message ${isUser ? 'msg-user' : 'msg-ai'}`;
+            
+            let html = '';
+            if (!isUser && metrics) {
+                html += `<div class="metrics">${metrics}</div>`;
+            }
+            html += `<div class="content">${isUser ? text.replace(/\\n/g, '<br>') : marked.parse(text)}</div>`;
+            div.innerHTML = html;
+            
+            history.appendChild(div);
+            history.scrollTo({ top: history.scrollHeight, behavior: 'smooth' });
+        }
+
+        function showTyping() {
+            const history = document.getElementById('chat-history');
+            const div = document.createElement('div');
+            div.className = 'typing';
+            div.id = 'typing-indicator';
+            div.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+            history.appendChild(div);
+            history.scrollTo({ top: history.scrollHeight, behavior: 'smooth' });
+        }
+
+        function hideTyping() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        let conversationHistory = [];
+
+        async function askQuestion() {
+            const input = document.getElementById('question');
+            const btn = document.getElementById('sendBtn');
+            const q = input.value.trim();
+            const p = document.getElementById('promptSelect').value;
+            if(!q) return;
+
+            // Clear input and show user message
+            input.value = '';
+            input.style.height = 'auto';
+            btn.disabled = true;
+            appendMessage(q, true);
+            showTyping();
+
+            try {
+                const response = await fetch('/api/query_stream', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({question: q, prompt_id: p, history: conversationHistory})
+                });
+                
+                conversationHistory.push({role: 'user', content: q});
+                hideTyping();
+                btn.disabled = false;
+                
+                // Create a new message bubble for AI
+                const historyDiv = document.getElementById('chat-history');
+                const div = document.createElement('div');
+                div.className = 'message msg-ai';
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'content';
+                div.appendChild(contentDiv);
+                historyDiv.appendChild(div);
+                
+                let fullAnswer = "";
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = "";
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep incomplete line
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.substring(6);
+                            if (dataStr === '[DONE]') break;
+                            try {
+                                const data = JSON.parse(dataStr);
+                                if (data.error) {
+                                    contentDiv.innerHTML = `<span style="color:var(--error)">Error: ${data.error}</span>`;
+                                    break;
+                                }
+                                if (data.content) {
+                                    fullAnswer += data.content;
+                                    // Remove <think> tags dynamically
+                                    let cleanAnswer = fullAnswer.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
+                                    contentDiv.innerHTML = marked.parse(cleanAnswer);
+                                    historyDiv.scrollTo({ top: historyDiv.scrollHeight });
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+                
+                conversationHistory.push({role: 'assistant', content: fullAnswer.replace(/<think>[\s\S]*?<\/think>/g, '').trim()});
+                
+            } catch (error) {
+                hideTyping();
+                btn.disabled = false;
+                appendMessage(`<span style="color:var(--error)">Connection Failed</span>`, false, 'NETWORK ERROR');
+                showToast("Connection Failed", true);
+            }
+        }
+    </script>
+</body>
+</html>

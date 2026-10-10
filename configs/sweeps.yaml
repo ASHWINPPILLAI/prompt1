@@ -1,0 +1,34 @@
+# configs/sweeps.yaml — experiment grids for E4, E5, E6.
+# Each grid is consumed by scripts/run_sweep.py.
+# Fix one variable, sweep the other. 3 repeats per setting, dev subset only.
+
+temperature:
+  # E4a: isolate randomness scaling; top_p held at 1.0 (no nucleus filtering)
+  values: [0.0, 0.3, 0.7, 1.0]
+  top_p: 1.0
+  repeats: 3
+  dev_subset: 50          # Questions from dev split only
+  prompt_id: v4           # Use current best version during parameter search
+
+top_p:
+  # E4b: top_p only has a visible effect when temperature > 0 (sampling active)
+  values: [0.3, 0.7, 0.9, 1.0]
+  temperature: 1.0
+  repeats: 3
+  dev_subset: 50
+  prompt_id: v4
+
+chunking:
+  # E5: retrieval parameter grid; LLM is called for correctness only on 3 configs
+  chunk_tokens: [200, 400, 800]
+  overlap_tokens: [0, 50]
+  top_k: [3, 5, 8]
+  dev_subset: 100         # Full dev set for retrieval-only; subset for LLM calls
+
+model_compare:
+  # E6: compare two model sizes; dev set only
+  models:
+    - key: model_a        # Small/fast model — fill name in .env as LLM_MODEL_A
+    - key: model_b        # Strong model — fill name in .env as LLM_MODEL_B
+  prompt_id: v5
+  dev_subset: 50

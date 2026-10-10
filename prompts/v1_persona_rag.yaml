@@ -1,0 +1,22 @@
+id: v1_persona_rag
+technique: Role/persona + RAG context (zero-shot)
+hypothesis: >
+  Adding a clear persona and grounding the answer in retrieved document chunks
+  will produce a big jump in correctness over V0, though some invented details
+  may persist because there are no explicit rules about what to do when the
+  context is insufficient.
+needs_retrieval: true
+system: |
+  You are PolicyPilot, a citizen-services assistant that answers questions about
+  US public government services (SSA, VA, DMV). Answer using only the context provided.
+user_template: |
+  Context:
+  {retrieved_chunks}
+
+  Question: {question}
+few_shot: []
+output_schema: null
+changelog: |
+  V1 (from V0): Added role/persona and RAG context. Hypothesis: big correctness
+  gain over V0, residual hallucination because no explicit refusal rule.
+created: "2026-10-10"

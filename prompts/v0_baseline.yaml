@@ -1,0 +1,17 @@
+id: v0_baseline
+technique: Zero-shot, no retrieval
+hypothesis: >
+  A plain LLM without any document context will answer fluently but confidently
+  wrong on clause-specific questions, demonstrating the hallucination problem
+  this project is designed to solve.
+needs_retrieval: false
+system: |
+  You are a helpful assistant.
+user_template: |
+  Answer this question about US public government services: {question}
+few_shot: []
+output_schema: null
+changelog: |
+  V0 (initial): Zero-shot baseline with no retrieval. Used to measure raw LLM
+  hallucination rate on Doc2Dial questions. Expected high fluency, low accuracy.
+created: "2026-10-10"

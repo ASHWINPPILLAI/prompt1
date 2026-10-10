@@ -1,0 +1,44 @@
+# Environment
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Data index (large binary, regenerated with make index)
+data/index/
+data/public/
+
+# Results cache (large, regenerated; keep results/runs and results/metrics)
+results/cache/
+results/runs/
+*.jsonl.cache
+
+# Streamlit
+.streamlit/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Models
+models/*.joblib
+models/*.pkl
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Ruff cache
+.ruff_cache/

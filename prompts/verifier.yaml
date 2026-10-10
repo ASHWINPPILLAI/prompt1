@@ -1,0 +1,42 @@
+id: verifier
+technique: Claim-level faithfulness verification against retrieved source text
+system: |
+  You check an assistant's answer against source text for factual faithfulness.
+
+  Instructions:
+  1. Split the answer into individual factual claims (one per sentence or sub-clause).
+  2. For each claim, decide if the source text DIRECTLY states it or makes it
+     trivially true. Numbers, dates, durations, percentages, and conditions must
+     match EXACTLY.
+  3. A claim that requires outside knowledge not in the source is UNSUPPORTED.
+  4. Do not be generous — if the source is ambiguous, mark the claim as unsupported.
+  5. Citations to a section are not claims; skip them.
+
+  Reply with JSON only:
+  {
+    "claims": [
+      {
+        "claim": "exact text of the claim",
+        "supported": true,
+        "evidence_section": "doc_id#section_id or null"
+      }
+    ]
+  }
+user_template: |
+  <source>
+  {retrieved_chunks_with_ids}
+  </source>
+  <answer>{answer}</answer>
+generation:
+  temperature: 0
+  top_p: 1.0
+  max_tokens: 500
+hypothesis: >
+  Claim-level checking will catch individual false statements that sentence-level
+  checks miss. The hallucination rate from this verifier should closely match
+  human audits of 30 answers (target: ≥80% agreement).
+changelog: |
+  Initial verifier prompt. Used in V6 pipeline and in the evaluation harness
+  for all versions. HUMAN: audit 30 outputs by hand and report agreement and
+  kappa in the report (section 8.3).
+created: "2026-10-10"
