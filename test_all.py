@@ -25,7 +25,7 @@ def run_tests():
         from policypilot.retrieval import retrieve
         res = retrieve("minimum age limit")
         assert len(res) > 0, "Retrieve returned empty list."
-        assert "content" in res[0], "Retrieve missing content field."
+        assert "text" in res[0], "Retrieve missing text field."
         passes += 1
         print("[PASS] SQLite FTS5 Search Engine works.")
     except Exception as e:
@@ -34,7 +34,7 @@ def run_tests():
         
     try:
         import urllib.request
-        req = urllib.request.Request("http://127.0.0.1:8502/")
+        req = urllib.request.Request("http://127.0.0.1:8501/")
         with urllib.request.urlopen(req) as response:
             assert response.status == 200
         passes += 1
