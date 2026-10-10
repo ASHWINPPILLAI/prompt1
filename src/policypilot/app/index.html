@@ -455,10 +455,14 @@ table.t td.best{font-weight:700;color:var(--accent)}
     <div class="row"><label for="set-open">Open source passages by default</label><input type="checkbox" id="set-open"></div>
     <div>
       <label class="lbl" for="set-api">PolicyPilot API URL</label>
-      <input type="url" id="set-api" placeholder="http://localhost:8000">
-      <p class="help">The page sends POST /api/chat to this address. Leave empty for preview answers.</p>
+      <input type="url" id="set-api" placeholder="http://localhost:8501">
+      <p class="help">The page sends POST /api/query_stream to this address. Leave empty for same-origin.</p>
     </div>
-    <div class="dlg-foot"><button class="btn" value="cancel">Cancel</button><button class="btn primary" id="set-save" value="ok">Save</button></div>
+    <div style="margin-top: 10px;">
+      <label class="lbl">Network Mode</label>
+      <select class="sel"><option>OpenRouter Fallback</option></select>
+    </div>
+    <div class="dlg-foot"><button class="btn" type="button" value="cancel" onclick="settings.close()">Cancel</button><button class="btn primary" type="button" id="set-save" value="ok">Save</button></div>
   </form>
 </dialog>
 <div class="toasts" id="toasts" aria-live="polite"></div>
@@ -786,17 +790,75 @@ function normalize(r, version) {
   return { text: r.answer || '', version: r.version || version, router: r.router || null, cites, reasoning: r.reasoning || [], trace: r.react_trace || [], verifier: r.verifier || null, usage: r.usage || {}, status, note: r.note || '' };
 }
 const API = {
-  async ask(req) {
-    const base = (S.settings.apiBase || '').trim();
-    try {
-      const r = await fetch(base.replace(/\/$/, '') + '/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return normalize(await r.json(), req.version);
-    } catch (e) {
-      toast('Could not reach backend API. Showing a preview answer instead.');
+  async ask(req, onChunk) {
+    const isDemo = new URLSearchParams(window.location.search).get('demo') === '1';
+    let base = (S.settings.apiBase || '').trim();
+    if (!base && !isDemo) base = window.location.origin;
+
+    if (!base) { // mock mode
       await sleep(reduceMotion() ? 0 : 450 + Math.random() * 350);
       return normalize(mock(req), req.version);
     }
+    
+    const oldReq = {
+      question: req.question,
+      prompt_id: req.version === 'auto' ? 'v4' : req.version,
+      history: []
+    };
+
+    const r = await fetch(base.replace(/\/$/, '') + '/api/query_stream', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify(oldReq) 
+    });
+    
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let fullAnswer = "";
+    
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); 
+        
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                const dataStr = line.substring(6);
+                if (dataStr === '[DONE]') break;
+                try {
+                    const data = JSON.parse(dataStr);
+                    if (data.error) throw new Error(data.error);
+                    if (data.content) {
+                        let text = data.content;
+                        fullAnswer += text;
+                        if (onChunk) onChunk(text, fullAnswer);
+                    }
+                } catch (e) {
+                    if (e.message !== 'Unexpected end of JSON input') throw e;
+                }
+            }
+        }
+    }
+    
+    const res = {
+       answer: fullAnswer.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim(),
+       answerable: true,
+       status: 'unverified',
+       version: req.version,
+       citations: [],
+       reasoning: [],
+       react_trace: [],
+       verifier: null,
+       router: null,
+       usage: { prompt_tokens: null, completion_tokens: null, latency_s: null }
+    };
+    return normalize(res, req.version);
   }
 };
 
@@ -866,12 +928,31 @@ async function send(text, opts = {}) {
   saveChats(); renderSide(); renderThread(); setBusy(true); S.stop = false;
   const box = $('#msgs'), typing = document.createElement('div'); typing.className = 'msg a'; typing.dataset.s = 'refused';
   typing.innerHTML = '<div class="rail"></div><div class="typing" aria-label="PolicyPilot is working"><i></i><i></i><i></i></div>'; box.appendChild(typing); $('#thread').scrollTop = $('#thread').scrollHeight;
-  let m; try { m = await API.ask({ question: text, version: S.version, params: S.params }); } catch (e) { typing.remove(); setBusy(false); toast('Something went wrong. Try again.'); return; }
-  m.role = 'assistant'; m.id = uid(); typing.remove();
-  const el = answerShell(m, true); box.appendChild(el); const tx = $('.atext', el), words = m.text.split(/(\s+)/); let shown = '';
-  if (reduceMotion()) shown = m.text; else for (const w of words) { if (S.stop) break; shown += w; tx.innerHTML = fmtText(shown); $('#thread').scrollTop = $('#thread').scrollHeight; await sleep(w.trim() ? 16 : 0); }
-  if (S.stop) { m.text = shown.trim() || m.text; }
-  fillAnswer(el, m); el.dataset.id = m.id; c.messages.push(m); saveChats(); setBusy(false); $('#thread').scrollTop = $('#thread').scrollHeight; $('#ask').focus();
+  let el = null, tx = null;
+  let m; 
+  try { 
+      m = await API.ask({ question: text, version: S.version, params: S.params }, (chunk, fullText) => {
+          if (!el) {
+              typing.remove();
+              el = answerShell({ status: 'unverified', cites: [], reasoning: [], trace: [], verifier: null, usage: {} }, true); 
+              box.appendChild(el); tx = $('.atext', el); el.dataset.id = uid();
+          }
+          if (S.stop) return;
+          tx.innerHTML = fmtText(fullText.replace(/<think>[\s\S]*?(<\/think>|$)/g, ''));
+          $('#thread').scrollTop = $('#thread').scrollHeight;
+      }); 
+  } catch (e) { 
+      typing.remove(); setBusy(false); toast(`Error: ${e.message}`); 
+      el = answerShell({ text: `Connection Failed: ${e.message}`, status: 'refused', cites: [], reasoning: [], trace: [], verifier: null, usage: {} }, false);
+      box.appendChild(el);
+      $('#thread').scrollTop = $('#thread').scrollHeight;
+      return; 
+  }
+  m.role = 'assistant'; m.id = (el && el.dataset.id) || uid();
+  if (S.stop) m.text = tx ? tx.innerText : m.text;
+  if (el) fillAnswer(el, m); 
+  else { typing.remove(); el = answerShell(m, true); box.appendChild(el); fillAnswer(el, m); el.dataset.id = m.id; }
+  c.messages.push(m); saveChats(); setBusy(false); $('#thread').scrollTop = $('#thread').scrollHeight; $('#ask').focus();
 }
 $('#msgs').addEventListener('click', e => {
   const tile = e.target.closest('.tile'); if (tile) { send(PRESETS[+tile.dataset.p].q); return; }
@@ -1016,12 +1097,40 @@ $('#csv-dummy').onclick = () => {
   S.evalDummy = true; renderEval();
 };
 
-/* ---------- init ---------- */
+async function checkConnection() {
+  const isDemo = new URLSearchParams(window.location.search).get('demo') === '1';
+  let base = (S.settings.apiBase || '').trim();
+  if (!base && !isDemo) base = window.location.origin;
+
+  if (isDemo) {
+      $('#mode-t').textContent = 'Preview';
+      $('.dot', $('#mode-pill')).style.background = 'var(--warn)';
+      $('#banner').style.display = 'flex';
+      $('span', $('#banner')).textContent = 'Preview mode: these are sample documents and canned answers, not real policy.';
+      return;
+  }
+  try {
+      const r = await fetch(base.replace(/\/$/, '') + '/api/prompts');
+      if (r.ok) {
+          $('#mode-t').textContent = 'Connected';
+          $('.dot', $('#mode-pill')).style.background = 'var(--accent)';
+          $('#banner').style.display = 'none';
+      } else { throw new Error('HTTP ' + r.status); }
+  } catch (e) {
+      $('#mode-t').textContent = 'Offline';
+      $('.dot', $('#mode-pill')).style.background = 'var(--error)';
+      $('#banner').style.display = 'flex';
+      $('span', $('#banner')).textContent = 'Backend is offline or unreachable. Check your connection or API URL.';
+  }
+}
+
 function init() {
   paintIcons(); applyTheme();
   matchMedia('(prefers-color-scheme: dark)').addEventListener && matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   if (S.user) showApp(); else showAuth();
+  checkConnection();
 }
+$('#set-save').addEventListener('click', () => { checkConnection(); });
 init();
 })();
 </script>

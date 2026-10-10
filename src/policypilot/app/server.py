@@ -31,6 +31,16 @@ from policypilot.pipeline import run_query
 from policypilot.prompting.loader import list_prompt_ids
 
 class PolicyPilotHandler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        super().end_headers()
+
+    def do_OPTIONS(self):
+        self.send_response(200, "ok")
+        self.end_headers()
+
     def do_GET(self):
         if self.path == '/':
             self.send_response(200)
@@ -73,57 +83,31 @@ class PolicyPilotHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(resp).encode("utf-8"))
             
-        elif self.path == '/api/chat':
+        elif self.path == '/api/query_stream':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            req = json.loads(post_data.decode('utf-8'))
+            
+            question = req.get("question", "")
+            prompt_id = req.get("prompt_id", "v0_baseline")
+            history = req.get("history", [])
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/event-stream')
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Connection', 'keep-alive')
+            self.end_headers()
+            
+            from policypilot.pipeline import stream_query
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                req = json.loads(post_data.decode('utf-8'))
-                
-                question = req.get("question", "")
-                version = req.get("version", "v0_baseline")
-                params = req.get("params", {})
-                history = req.get("history", [])
-                
-                from policypilot.pipeline import run_query
-                record = run_query(question, version, config=params, history=history)
-                
-                # Format the RunRecord to match the new frontend's API contract
-                answer = record.raw_output
-                if record.parsed_output:
-                    answer = record.parsed_output.get("answer", record.raw_output)
-                
-                status = "unverified"
-                if record.retrieved_section_ids:
-                    status = "grounded"
-                    
-                resp_data = {
-                    "answer": answer,
-                    "answerable": True,
-                    "status": status,
-                    "version": record.prompt_id,
-                    "citations": [{"section_id": cid} for cid in record.retrieved_section_ids],
-                    "reasoning": record.parsed_output.get("reasoning", []) if record.parsed_output else [],
-                    "react_trace": [{"thought": step.get("thought", ""), "action": f"{step.get('action', '')}[{step.get('action_input', '')}]", "observation": step.get("observation", "")} for step in record.parsed_output.get("trace", [])] if record.parsed_output else [],
-                    "verifier": None,
-                    "router": None,
-                    "usage": {
-                        "prompt_tokens": getattr(record, 'prompt_tokens', 0) or 0,
-                        "completion_tokens": getattr(record, 'completion_tokens', 0) or 0,
-                        "latency_s": round(getattr(record, 'latency_s', 0.1) or 0.1, 2)
-                    }
-                }
-                
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps(resp_data).encode('utf-8'))
+                for chunk in stream_query(question, prompt_id, history):
+                    self.wfile.write(f"data: {json.dumps({'content': chunk})}\n\n".encode('utf-8'))
+                    self.wfile.flush()
+                self.wfile.write(b"data: [DONE]\n\n")
+                self.wfile.flush()
             except Exception as e:
-                import traceback
-                traceback.print_exc()
-                self.send_response(500)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+                self.wfile.write(f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8'))
+                self.wfile.flush()
         else:
             self.send_response(404)
             self.end_headers()
