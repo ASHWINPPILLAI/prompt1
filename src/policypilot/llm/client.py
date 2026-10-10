@@ -44,6 +44,8 @@ class LLMClient:
         payload = {
             "models": [model, "openrouter/free"],
             "messages": messages,
+            "include_reasoning": True,
+            "reasoning": {"type": "enabled"},
             **params
         }
         
@@ -73,9 +75,15 @@ class LLMClient:
             logger.error(f"Request failed: {e}")
             raise
 
+        message = body["choices"][0]["message"]
+        content = message.get("content", "")
+        reasoning = message.get("reasoning") or message.get("reasoning_details")
+        if reasoning:
+            content = f"<think>\n{reasoning}\n</think>\n{content}"
+
         return {
-            "content": body["choices"][0]["message"]["content"],
-            "usage": body["usage"],
+            "content": content,
+            "usage": body.get("usage", {}),
             "cached": False,
         }
 
@@ -86,6 +94,7 @@ class LLMClient:
             "models": [model, "openrouter/free"],
             "messages": messages,
             "stream": True,
+            "include_reasoning": True,
             **kwargs
         }
         
@@ -103,6 +112,7 @@ class LLMClient:
             method="POST"
         )
         
+        in_reasoning = False
         with urllib.request.urlopen(req) as response:
             for line in response:
                 line = line.decode("utf-8").strip()
@@ -114,10 +124,21 @@ class LLMClient:
                         chunk = json.loads(data_str)
                         if "choices" in chunk and len(chunk["choices"]) > 0:
                             delta = chunk["choices"][0].get("delta", {})
-                            if "content" in delta:
+                            reasoning = delta.get("reasoning") or delta.get("reasoning_details")
+                            if reasoning:
+                                if not in_reasoning:
+                                    yield "<think>\n"
+                                    in_reasoning = True
+                                yield reasoning
+                            elif "content" in delta:
+                                if in_reasoning:
+                                    yield "\n</think>\n"
+                                    in_reasoning = False
                                 yield delta["content"]
                     except Exception:
                         continue
+            if in_reasoning:
+                yield "\n</think>\n"
 
     def chat(self, messages: list[dict], seed: int | None = None, **kwargs) -> dict:
         params = kwargs.copy()
