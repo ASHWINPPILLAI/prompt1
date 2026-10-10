@@ -569,7 +569,9 @@
                                 const data = JSON.parse(dataStr);
                                 if (data.error) {
                                     contentDiv.innerHTML = `<span style="color:var(--error)">Error: ${data.error}</span>`;
-                                    break;
+                                    hideTyping();
+                                    btn.disabled = false;
+                                    return;
                                 }
                                 if (data.content) {
                                     fullAnswer += data.content;
@@ -588,7 +590,7 @@
             } catch (error) {
                 hideTyping();
                 btn.disabled = false;
-                appendMessage(`<span style="color:var(--error)">Connection Failed</span>`, false, 'NETWORK ERROR');
+                appendMessage(`<span style="color:var(--error)">Connection Failed: ${error.message}</span>`, false, 'NETWORK ERROR');
                 showToast("Connection Failed", true);
             }
         }

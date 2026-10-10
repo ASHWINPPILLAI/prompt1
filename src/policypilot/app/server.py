@@ -12,6 +12,21 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
+# --- Native Zero-Dependency .env Loader ---
+import os
+def load_dotenv():
+    env_path = Path(__file__).resolve().parent.parent.parent.parent / '.env'
+    if env_path.exists():
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, val = line.split('=', 1)
+                    os.environ[key.strip()] = val.strip().strip("'").strip('"')
+
+load_dotenv()
+# ------------------------------------------
+
 from policypilot.pipeline import run_query
 from policypilot.prompting.loader import list_prompt_ids
 
