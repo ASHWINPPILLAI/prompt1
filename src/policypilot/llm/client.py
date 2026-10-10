@@ -41,13 +41,24 @@ class LLMClient:
 
     def _live_call(self, model: str, messages: list[dict], params: dict) -> dict:
         url = self.base_url if self.base_url.endswith("/api/llm") else f"{self.base_url}/chat/completions"
+        is_gateway = url.endswith("/api/llm")
+        
         payload = {
-            "models": [model, "openrouter/free"],
             "messages": messages,
             "include_reasoning": True,
             "reasoning": {"type": "enabled"},
             **params
         }
+        
+        if not is_gateway:
+            payload["models"] = [model, "openrouter/free"]
+        else:
+            # Gateway strictly forbids extra fields
+            payload.pop("seed", None)
+            payload.pop("max_tokens", None) # Optional: if gateway overrides it, but gateway does accept max_tokens
+            # Let's keep only what ChatRequest allows
+            allowed = {"messages", "temperature", "top_p", "max_tokens", "include_reasoning", "reasoning"}
+            payload = {k: v for k, v in payload.items() if k in allowed}
         
         headers = {
             "Content-Type": "application/json",
@@ -75,28 +86,40 @@ class LLMClient:
             logger.error(f"Request failed: {e}")
             raise
 
-        message = body["choices"][0]["message"]
-        content = message.get("content", "")
-        reasoning = message.get("reasoning") or message.get("reasoning_details")
-        if reasoning:
-            content = f"<think>\n{reasoning}\n</think>\n{content}"
+        if is_gateway:
+            content = body.get("content", "")
+            usage = body.get("usage", {})
+        else:
+            message = body["choices"][0]["message"]
+            content = message.get("content", "")
+            reasoning = message.get("reasoning") or message.get("reasoning_details")
+            if reasoning:
+                content = f"<think>\n{reasoning}\n</think>\n{content}"
+            usage = body.get("usage", {})
 
         return {
             "content": content,
-            "usage": body.get("usage", {}),
+            "usage": usage,
             "cached": False,
         }
 
     def stream_chat(self, messages: list[dict], **kwargs) -> Iterator[str]:
         model = kwargs.pop("model", self.model)
         url = f"{self.base_url}/stream" if self.base_url.endswith("/api/llm") else f"{self.base_url}/chat/completions"
+        is_gateway = self.base_url.endswith("/api/llm")
+        
         payload = {
-            "models": [model, "openrouter/free"],
             "messages": messages,
-            "stream": True,
             "include_reasoning": True,
             **kwargs
         }
+        
+        if not is_gateway:
+            payload["models"] = [model, "openrouter/free"]
+            payload["stream"] = True
+        else:
+            allowed = {"messages", "temperature", "top_p", "max_tokens", "include_reasoning", "reasoning"}
+            payload = {k: v for k, v in payload.items() if k in allowed}
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",
