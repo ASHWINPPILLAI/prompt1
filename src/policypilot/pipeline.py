@@ -60,6 +60,17 @@ def stream_query(
     prompt_id: str,
     history: list[dict[str, str]] | None = None
 ) -> Iterator[str]:
+    # If the user selects a ReAct/tool-calling agent, native streaming breaks the loop.
+    # We run it synchronously and simulate a stream for the final answer.
+    if "react" in prompt_id:
+        record = run_query(question, prompt_id, history=history)
+        yield "*(Agent used internal tools to compute this)*\n\n"
+        answer = record.parsed_output.get("answer", record.raw_output) if record.parsed_output else record.raw_output
+        for word in str(answer).split():
+            yield word + " "
+            time.sleep(0.01)
+        return
+
     prompt = load_prompt(prompt_id)
     messages = build_messages(prompt, question, history=history)
     client = get_client()

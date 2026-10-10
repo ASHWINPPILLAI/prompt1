@@ -80,7 +80,8 @@ def build_messages(
     
     messages = [{"role": "system", "content": sys_text}]
     messages.extend(prompt.few_shot)
-    for msg in history:
+    # Sliding window of last 10 to prevent OOM
+    for msg in history[-10:]:
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": usr_text})
     return messages
