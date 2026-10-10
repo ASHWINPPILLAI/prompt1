@@ -788,15 +788,15 @@ function normalize(r, version) {
 const API = {
   async ask(req) {
     const base = (S.settings.apiBase || '').trim();
-    if (base) {
-      try {
-        const r = await fetch(base.replace(/\/$/, '') + '/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return normalize(await r.json(), req.version);
-      } catch (e) { toast('Could not reach ' + base + '. Showing a preview answer instead.'); }
+    try {
+      const r = await fetch(base.replace(/\/$/, '') + '/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return normalize(await r.json(), req.version);
+    } catch (e) {
+      toast('Could not reach backend API. Showing a preview answer instead.');
+      await sleep(reduceMotion() ? 0 : 450 + Math.random() * 350);
+      return normalize(mock(req), req.version);
     }
-    await sleep(reduceMotion() ? 0 : 450 + Math.random() * 350);
-    return normalize(mock(req), req.version);
   }
 };
 
