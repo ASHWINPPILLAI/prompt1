@@ -29,7 +29,7 @@ class LLMClient:
         base_url: str | None = None,
     ) -> None:
         self.model = model or os.environ.get("LLM_MODEL", "nvidia/llama-3.1-nemotron-70b-instruct:free")
-        self.api_key = api_key or os.environ.get("LLM_API_KEY", "")
+        self.api_key = api_key or os.environ.get("LLM_API_KEY", "eMMJ11A1sYr0bVIc27fmtuFCtaxFoisBa70k-AvnwII")
         self.base_url = (base_url or os.environ.get("LLM_BASE_URL", "https://openrouter.ai/api/v1")).rstrip("/")
         
         _CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -40,7 +40,7 @@ class LLMClient:
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
     def _live_call(self, model: str, messages: list[dict], params: dict) -> dict:
-        url = f"{self.base_url}/chat/completions"
+        url = self.base_url if self.base_url.endswith("/api/llm") else f"{self.base_url}/chat/completions"
         payload = {
             "models": [model, "openrouter/free"],
             "messages": messages,
@@ -89,7 +89,7 @@ class LLMClient:
 
     def stream_chat(self, messages: list[dict], **kwargs) -> Iterator[str]:
         model = kwargs.pop("model", self.model)
-        url = f"{self.base_url}/chat/completions"
+        url = f"{self.base_url}/stream" if self.base_url.endswith("/api/llm") else f"{self.base_url}/chat/completions"
         payload = {
             "models": [model, "openrouter/free"],
             "messages": messages,
