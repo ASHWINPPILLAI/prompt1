@@ -102,11 +102,11 @@ class PolicyPilotHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-class ReusableTCPServer(socketserver.TCPServer):
+class ReusableThreadingTCPServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
 
 def run(port=8501):
-    with ReusableTCPServer(("", port), PolicyPilotHandler) as httpd:
+    with ReusableThreadingTCPServer(("", port), PolicyPilotHandler) as httpd:
         print(f"Zero-dependency PolicyPilot Web Server running at http://localhost:{port}")
         httpd.serve_forever()
 
