@@ -34,19 +34,21 @@ def retrieve(query: str, k: int = 3) -> list[dict]:
         conn = _init_db()
         c = conn.cursor()
         
-        # Basic keyword extraction
-        keywords = ' OR '.join(query.replace('"', '').split())
+        # Basic keyword extraction, removing punctuation for FTS5
+        import re
+        safe_query = re.sub(r'[^\w\s]', '', query)
+        keywords = ' OR '.join(safe_query.split())
         
         c.execute("SELECT id, snippet(docs, 1, '', '', '...', 32) as snip FROM docs WHERE docs MATCH ? ORDER BY rank LIMIT ?", (keywords, k))
         results = []
         for row in c.fetchall():
             results.append({
                 "clause_id": row[0],
-                "content": f"[From {row[0]}]: {row[1]}"
+                "text": f"[From {row[0]}]: {row[1]}"
             })
             
         if not results:
-            return [{"clause_id": "default", "content": "No relevant policy documents found in the internal database."}]
+            return [{"clause_id": "default", "text": "No relevant policy documents found in the internal database."}]
         return results
     except Exception as e:
         logger.error(f"FTS5 Search error: {e}")
@@ -54,10 +56,10 @@ def retrieve(query: str, k: int = 3) -> list[dict]:
         return [
             {
                 "clause_id": "MOCK-DOC-1",
-                "content": "Mock retrieved content: Example rule states 62 is the minimum age for retirement benefits."
+                "text": "Mock retrieved content: Example rule states 62 is the minimum age for retirement benefits."
             },
             {
                 "clause_id": "MOCK-DOC-2",
-                "content": "Attendance policy: Students must maintain 90% attendance to pass the semester."
+                "text": "Attendance policy: Students must maintain 90% attendance to pass the semester."
             }
         ]
