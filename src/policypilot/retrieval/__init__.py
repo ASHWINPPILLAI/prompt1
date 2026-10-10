@@ -28,8 +28,12 @@ def _init_db() -> sqlite3.Connection:
         conn.commit()
     return conn
 
+import json
+import urllib.request
+import os
+
 def retrieve(query: str, k: int = 3) -> list[dict]:
-    """Retrieve chunks using SQLite FTS5 (Pure Python)."""
+    """Retrieve chunks using SQLite FTS5 and rerank via OpenRouter Nemotron Rerank."""
     try:
         conn = _init_db()
         c = conn.cursor()
@@ -39,20 +43,52 @@ def retrieve(query: str, k: int = 3) -> list[dict]:
         safe_query = re.sub(r'[^\w\s]', '', query)
         keywords = ' OR '.join(safe_query.split())
         
-        c.execute("SELECT id, snippet(docs, 1, '', '', '...', 32) as snip FROM docs WHERE docs MATCH ? ORDER BY rank LIMIT ?", (keywords, k))
-        results = []
-        for row in c.fetchall():
-            results.append({
+        # Fetch top 15 candidates with full content for reranking
+        c.execute("SELECT id, content FROM docs WHERE docs MATCH ? ORDER BY rank LIMIT 15", (keywords,))
+        candidates = c.fetchall()
+        
+        if not candidates:
+            return [{"clause_id": "default", "text": "No relevant policy documents found in the internal database."}]
+            
+        api_key = os.environ.get("LLM_API_KEY", "")
+        if not api_key:
+            # Fallback if no API key
+            return [{"clause_id": row[0], "text": f"[From {row[0]}]: {row[1][:300]}..."} for row in candidates[:k]]
+            
+        payload = {
+            "model": "nvidia/llama-nemotron-rerank-vl-1b-v2:free",
+            "query": query,
+            "documents": [{"text": row[1][:2000]} for row in candidates],  # truncate to avoid huge payload
+            "top_n": k
+        }
+        
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/v1/rerank",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST"
+        )
+        
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            
+        reranked = []
+        for r in result.get("results", []):
+            idx = r["index"]
+            row = candidates[idx]
+            # Provide snippet of the full content
+            reranked.append({
                 "clause_id": row[0],
-                "text": f"[From {row[0]}]: {row[1]}"
+                "text": f"[From {row[0]}]: {row[1][:400]}..."
             })
             
-        if not results:
-            return [{"clause_id": "default", "text": "No relevant policy documents found in the internal database."}]
-        return results
+        return reranked
     except Exception as e:
-        logger.error(f"FTS5 Search error: {e}")
-        # Graceful fallback to mock if the DB is locked or fails
+        logger.error(f"FTS5/Rerank error: {e}")
+        # Graceful fallback to mock if the DB is locked or API fails
         return [
             {
                 "clause_id": "MOCK-DOC-1",
