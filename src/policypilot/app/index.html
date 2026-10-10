@@ -371,7 +371,7 @@ table.t td.best{font-weight:700;color:var(--accent)}
       <button class="vbtn" id="ver-top" aria-haspopup="menu"><span id="ver-name">V5 ReAct tools</span><small id="ver-sub"></small><span data-i="chevron"></span></button>
       <span class="sp"></span>
       <span class="pill kb" title="Documents the assistant can search">Knowledge base: SSA, VA, DMV</span>
-      <span class="pill" id="mode-pill" title="Connection status"><i class="dot"></i><span id="mode-t">Preview</span></span>
+      <span class="pill" id="mode-pill" title="Connection status"><i class="dot" style="background:var(--muted)"></i><span id="mode-t">Connecting...</span></span>
       <button class="ib" id="copy-chat" aria-label="Copy chat as Markdown" title="Copy chat as Markdown"><span data-i="copy"></span></button>
       <button class="ib" id="clear-chat" aria-label="Clear chat" title="Clear chat"><span data-i="trash"></span></button>
       <button class="ib" id="theme-btn" aria-label="Toggle theme" title="Toggle theme"><span data-i="moon"></span></button>
@@ -800,9 +800,19 @@ const API = {
       return normalize(mock(req), req.version);
     }
     
+    const versionMap = {
+      'v0': 'v0_baseline',
+      'v1': 'v1_persona_rag',
+      'v2': 'v2_rules_json',
+      'v3': 'v3_fewshot',
+      'v4': 'v4_cot',
+      'v5': 'v5_react',
+      'v6': 'v6_verifier',
+      'auto': 'routed'
+    };
     const oldReq = {
       question: req.question,
-      prompt_id: req.version === 'auto' ? 'v4' : req.version,
+      prompt_id: versionMap[req.version] || req.version,
       history: []
     };
 

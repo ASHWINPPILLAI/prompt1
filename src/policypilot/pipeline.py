@@ -29,8 +29,8 @@ _REACT_PROMPT_IDS = {"v5", "v6", "routed"}  # prompt ids that use the ReAct loop
 _VERIFIER_PROMPT_IDS = {"v6"}               # prompt ids that also run the verifier
 
 _REFUSAL_TEMPLATE = (
-    "The provided documents do not cover this question. "
-    "Please check the official agency website or contact the relevant office."
+    "Hello! I am PolicyPilot, an AI assistant focused on US government services (SSA, VA, DMV). "
+    "I can only answer questions based on official documents, so I cannot answer this. How can I help you today?"
 )
 _ADVERSARIAL_TEMPLATE = (
     "This question appears to contain an instruction injection. "
@@ -60,9 +60,9 @@ def stream_query(
     prompt_id: str,
     history: list[dict[str, str]] | None = None
 ) -> Iterator[str]:
-    # If the user selects a ReAct/tool-calling agent, native streaming breaks the loop.
+    # If the user selects a ReAct/tool-calling agent or the router, native streaming breaks the loop.
     # We run it synchronously and simulate a stream for the final answer.
-    if "react" in prompt_id:
+    if "react" in prompt_id or prompt_id == "routed":
         record = run_query(question, prompt_id, history=history)
         yield "*(Agent used internal tools to compute this)*\n\n"
         answer = record.parsed_output.get("answer", record.raw_output) if record.parsed_output else record.raw_output
